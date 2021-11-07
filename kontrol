@@ -1,5 +1,5 @@
 #!/bin/python3
-"""Usage: kontrol.py <command>
+"""Usage: kontrol <command>
 up|down|right|left : move selection in given direction
 enter  : "select" current selection
 back   : just back.

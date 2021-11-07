@@ -12,7 +12,7 @@ Currently TV Show selection isnt implemented for Rofi.
 
 # Usage
 ```
-Usage: kontrol.py <command>
+Usage: kontrol <command>
 up|down|right|left : move selection in given direction
 enter  : "select" current selection
 back   : just back.
@@ -40,7 +40,7 @@ NOTIFY = True  # send notification via notify-send
 Kontrol supports Rofi for selecting and playing media.
 ![](https://quad.pe/e/2MQrxV1vJq.png)
 
-Set `ROFI=True` in `kontrol.py`
+Set `ROFI=True` in `kontrol`
 
 ### Notifications
 Notifications are optional via `NOTIFY=True`, it requires `notify-send` to be available.
@@ -49,7 +49,7 @@ Notifications can get a bit spammy.
 ### i3wm and sway example
 ```conf
 mode "kodi" {
-        set $kontrol exec --no-startup-id /path/to/kontrol.py 
+        set $kontrol exec --no-startup-id /path/to/kontrol
         bindsym $mod+d $kontrol movies
         #bindsym $mod+Shift+d $kontrol shows
         bindsym j $kontrol left
