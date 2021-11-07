@@ -1,0 +1,167 @@
+#!/bin/python3
+"""Usage: kontrol.py <command>
+up|down|right|left : move selection in given direction
+enter  : "select" current selection
+back   : just back.
+-<int>  : decrease volume
++<int>  : increase volume
+mute  : mute
+play  : play or pause
+stop  : stop playback
+movies  : if ROFI, play movies via rofi, else print JSON from kodi
+shows   : TODO
+text : run tk dialog for sending text"""
+
+import subprocess
+import sys
+from functools import partial
+
+HOST = "192.168.1.2"
+PORT = 8080
+USERNAME = "kodi"
+PASSWORD = "pass"
+ROFI = True  # use rofi
+NOTIFY = True  # send notification via notify-send
+
+
+def notify(msg: str, urgent: bool = False) -> None:
+    _msg = f"KONTROL - {msg}"
+    print(_msg)
+    if NOTIFY:
+        cmd = ["notify-send"]
+        if urgent:
+            cmd += ["-u", "critical"]
+        cmd += [_msg]
+        subprocess.run(cmd)
+
+
+def rofi(lines: list) -> str:
+    proc = subprocess.Popen(
+        ["rofi", "-dmenu", "-i"], stdout=subprocess.PIPE, stdin=subprocess.PIPE
+    )
+    a = "\n".join(lines)
+    out, err = proc.communicate(input=a.encode())
+    return out.decode().strip()
+
+
+try:
+    from kodipydent import Kodi
+except ModuleNotFoundError:
+    _err_msg = "kodipydent is required, pip3 install --user kodipydent"
+    notify(_err_msg, True)
+    sys.exit(1)
+
+
+KODI = Kodi(HOST, port=PORT, username=USERNAME, password=PASSWORD)
+
+
+def volume(incr: str = "", mute: bool = False) -> None:
+    if mute:
+        is_muted = KODI.Application.GetProperties(["muted"])["result"]["muted"]
+        KODI.Application.SetMute(not is_muted)
+        notify(f"Set {HOST} mute {not is_muted}")
+    else:
+        cur_volume = KODI.Application.GetProperties(["volume"])["result"]["volume"]
+        if incr.startswith("-"):
+            adjustment = cur_volume - int(incr.lstrip("-"))
+        else:
+            adjustment = cur_volume + int(incr.lstrip("+"))
+        KODI.Application.SetVolume(adjustment)
+        notify(f"Set {HOST} volume: {adjustment}")
+
+
+def playback(playpause: bool = False, stop: bool = False) -> None:
+    try:
+        # TODO how do multiple players even work
+        player_id = KODI.Player.GetActivePlayers()["result"][0]["playerid"]
+    except IndexError:
+        notify(f"Nothing is playing on {HOST}")
+    else:
+        if playpause:
+            KODI.Player.PlayPause(player_id)
+        elif stop:
+            KODI.Player.Stop(player_id)
+
+
+def getmovies() -> None:
+    movies_kodi = KODI.VideoLibrary.GetMovies()["result"]["movies"]
+    movies = {}
+    for each in movies_kodi:
+        movies[each["label"]] = each["movieid"]
+    if ROFI:
+        selected = rofi(sorted(movies.keys()))
+        if selected != "":
+            KODI.Player.Open(item={"movieid": movies[selected]})
+            notify(f"playing: {selected}")
+    else:
+        import json
+
+        print(json.dumps(movies_kodi))
+
+
+def getshows() -> None:
+    # TODO figure out how to handle this, potentially loop rofi
+    # a few times, shows -> seasons -> episodes
+    shows_kodi = KODI.VideoLibrary.GetTVShows()["result"]["tvshows"]
+    shows = {}
+    for each in shows_kodi:
+        shows[each["label"]] = each["tvshowid"]
+    if ROFI:
+        selected = rofi(shows.keys())
+        if selected != "":
+            return
+    else:
+        import json
+
+        print(json.dumps(shows_kodi))
+
+
+def sendtext():
+    # fire up a tk dialog for sending text
+    # TODO use rofi?
+    # TODO build own dialog. Feature 3 buttons for cancel, send and finish, just send
+    # to allow sending partial text. Maybe see if we can get already entered text
+    # to prefill the dialog
+    try:
+        import tkinter
+        import tkinter.simpledialog
+    except ImportError:
+        return
+    else:
+        root = tkinter.Tk()
+        root.withdraw()
+        txt = tkinter.simpledialog.askstring("Kontrol", "Send text:")
+        del root
+        KODI.Input.SendText(txt, done=True)
+
+
+def run(args: list) -> None:
+    if "-" in args[0] or "+" in args[0]:
+        volume(args[0])
+    else:
+        # functools.partial
+        cmds = {
+            "mute": partial(volume, mute=True),
+            "play": partial(playback, playpause=True),
+            "stop": partial(playback, stop=True),
+            "up": partial(KODI.Input.Up),
+            "down": partial(KODI.Input.Down),
+            "left": partial(KODI.Input.Left),
+            "right": partial(KODI.Input.Right),
+            "enter": partial(KODI.Input.Select),
+            "back": partial(KODI.Input.Back),
+            "text": partial(sendtext),
+            "movies": partial(getmovies),
+            #"shows": partial(getshows),
+        }
+        if args[0] in cmds.keys():
+            cmds[args[0]]()
+        else:
+            notify(f"Unrecognized command: {args[0]}", urgent=True)
+
+
+if __name__ == "__main__":
+    if len(sys.argv[1:]) == 0:
+        print(__doc__)
+    else:
+        run(sys.argv[1:])
