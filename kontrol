@@ -149,7 +149,7 @@ def run(args: list) -> None:
             "back": partial(KODI.Input.Back),
             "text": partial(sendtext),
             "movies": partial(getmovies),
-            #"shows": partial(getshows),
+            # "shows": partial(getshows),
         }
         if args[0] in cmds.keys():
             cmds[args[0]]()
