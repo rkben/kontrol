@@ -52,9 +52,6 @@ except ModuleNotFoundError:
     sys.exit(1)
 
 
-KODI = Kodi(HOST, port=PORT, username=USERNAME, password=PASSWORD)
-
-
 def volume(incr: str = "", mute: bool = False) -> None:
     if mute:
         is_muted = KODI.Application.GetProperties(["muted"])["result"]["muted"]
@@ -164,4 +161,5 @@ if __name__ == "__main__":
     if len(sys.argv[1:]) == 0:
         print(__doc__)
     else:
+        KODI = Kodi(HOST, port=PORT, username=USERNAME, password=PASSWORD)
         run(sys.argv[1:])
